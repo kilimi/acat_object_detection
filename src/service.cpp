@@ -1,0 +1,184 @@
+#define EIGEN_YES_I_KNOW_SPARSE_MODULE_IS_NOT_STABLE_YET 1
+
+#define PCL_NO_PRECOMPILE
+#include <pcl/point_traits.h>
+#include <pcl/features/normal_3d_omp.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/registration/correspondence_rejection_sample_consensus.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/registration/icp.h>
+
+#include <pcl/filters/impl/radius_outlier_removal.hpp>
+#include <pcl/filters/radius_outlier_removal.h>
+#include <pcl/search/impl/search.hpp>
+#include <pcl/search/search.h>
+#include <pcl/search/impl/kdtree.hpp>
+#include <pcl/search/kdtree.h>
+#include <pcl/kdtree/impl/kdtree_flann.hpp>
+#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/search/impl/organized.hpp>
+#include <pcl/search/organized.h>
+#include <pcl/filters/impl/filter.hpp>
+#include <pcl/filters/filter.h>
+#include <pcl/filters/impl/filter_indices.hpp>
+#include <pcl/filters/filter_indices.h>
+#include <pcl/impl/pcl_base.hpp>
+#include <pcl/pcl_base.h>
+#include <pcl/outofcore/outofcore.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl_conversions/pcl_conversions.h>
+
+// ROS
+#include <ros/package.h>
+#include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <std_msgs/String.h>
+// STL
+#include <map>
+
+// Boost
+#include <boost/algorithm/string.hpp>
+
+// Include pose estimation library
+#include <PoseEstimation/DescriptorUtil.h>
+#include <PoseEstimation/PoseEstimation.h>
+
+using namespace PoseEstimation;
+#include "PoseFilter.h"
+#include <object_detection/DetectObject.h>
+typedef object_detection::DetectObject DetectObject;
+
+// Descriptor type used
+typedef DescRGBN DescT;
+Recognition<DescT>::Ptr rec;
+
+bool visualize = false;
+
+void storeResults(DetectObject::Response &resp, Detection::Vec rot_alone){
+	// Store results
+	resp.labels_int.resize(rot_alone.size());
+	resp.poses.reserve(rot_alone.size());
+	resp.pose_value.resize(rot_alone.size());
+
+	for(size_t i = 0; i < rot_alone.size(); ++i) {
+		Detection& di = rot_alone[i];
+		resp.labels_int[i] = i;
+		KMatrix<> pose = di.pose;
+		KQuaternion quaternion = pose.rotationQuaternion();
+
+		geometry_msgs::Transform result;
+		result.translation.x = pose[3];
+		result.translation.y = pose[7];
+		result.translation.z = pose[11];
+
+		result.rotation.x = quaternion[0];
+		result.rotation.y = quaternion[1];
+		result.rotation.z = quaternion[2];
+		result.rotation.w = quaternion[3];
+
+		resp.poses.push_back(result);
+		resp.pose_value[i] = 1 - di.penalty;
+	}
+}
+
+bool global(DetectObject::Request &req, DetectObject::Response &resp){
+
+	ROS_INFO("Starting pose estimation...");
+	bool visualize = req.visualize;
+	bool table = req.table;
+	bool rotorcap = req.rotorcap;
+	bool gravity = false;
+	bool reverse = false;
+	bool planar = false;
+	bool verbose = false;
+
+    float resolution = req.threshold;
+	float radius = 35;
+    float threshold = 10;
+	float fraction = 0.25;
+	float far = 1500;
+	float cothres = req.cothres;
+	int corrnum = 1;
+	std::string method = "voting";
+
+	std::vector<std::string> _objects;
+	_objects = req.objects;
+
+	// Setup recognition
+	rec.reset( new RecognitionVoting<DescT>(resolution, radius, threshold, fraction, table, planar, true, far) );
+
+	rec->setCoplanarityFraction(cothres);
+	rec->setGravity(gravity);
+	rec->setReverse(reverse);
+	if (corrnum > 0)
+		rec->setCorrNum(corrnum);
+	rec->setVerbose(verbose);
+	rec->loadObjects(_objects);
+
+	// Get the scene
+	pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr scene(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
+	pcl::fromROSMsg(req.cloud, *scene);
+
+	if(scene->empty()) {
+		ROS_ERROR("Empty point cloud!");
+		return false;
+	}
+
+	// Report
+	ROS_INFO("Starting estimation...");
+
+	// Start
+	DescriptorUtil util;
+	DescT::Vec scene_covis = util.fromPCL<pcl::PointXYZRGBNormal,DescT>(*scene);
+	Detection::Vec globalres = rec->recognize(scene_covis);
+	const Detection& best = globalres[0];
+	Detection::Vec best_pose;
+	best_pose.push_back(best);
+
+	if (visualize) {
+		DescriptorUtil du;
+		du.showDetections<DescT>(rec->getObjects(), rec->getScene(), globalres);
+	}
+	if (rotorcap){
+		pcl::console::print_warn("Removing bad rotorcaps! \n");
+		Detection::Vec new_rotorcaps = filter(globalres);
+		pcl::console::print_value("Amount of detections after: %d\n", new_rotorcaps.size());
+
+		if (visualize){
+			DescriptorUtil   du1;
+			du1.showDetections<DescT>(rec->getObjects(), rec->getScene(), new_rotorcaps);
+		}
+		storeResults(resp, new_rotorcaps);
+	}else {
+		storeResults(resp, best_pose);
+	}
+
+	ROS_INFO("Finished GLOBAL estimation!");
+
+	return true;
+}
+
+/*
+ * Main entry point
+ */
+int main(int argc, char **argv) {
+
+	// setup node
+	// Initialize node
+	const std::string name = "object_detection";
+	ros::init(argc, argv, name);
+	ros::NodeHandle nh("~");
+	// Start
+	ros::ServiceServer servglobal = nh.advertiseService<DetectObject::Request, DetectObject::Response>("getPose", global);
+	ros::spin();
+
+	return 0;
+}
+
+
+
+
+
+
+

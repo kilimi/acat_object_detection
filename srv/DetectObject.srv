@@ -1,0 +1,38 @@
+# REQUEST
+# Input scene
+sensor_msgs/PointCloud2 cloud
+
+# Input models
+#sensor_msgs/PointCloud2[] objects, in case of two objects: first obj is small, e.g rotorcap, then big - conveyour
+string[] objects
+
+#result vizualize flag
+bool visualize
+
+#result vizualize flag
+bool rotorcap
+
+#if there is table flag
+bool table
+
+#threshold value
+float64 threshold
+
+#cothres value
+float64 cothres
+
+---
+
+# RESPONSE
+
+# Poses of detected objects, size equal to size(labels_int)*16
+geometry_msgs/Transform[] poses
+
+# Indices of detected objects, can be used to associate each detection to an object point cloud inside objects
+uint32[] labels_int
+
+# Object point clouds, can be indexed by labels_int
+sensor_msgs/PointCloud2[] objects
+
+# Pose godness value [0,1] for each detection
+float64[] pose_value
