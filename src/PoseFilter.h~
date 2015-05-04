@@ -47,23 +47,23 @@ Detection::Vec filter(const Detection::Vec& detections) {
    const int axis = 1;
    
    // Choose reference axis - this I found by clicking in bm_filtered.pcd as an axis pointing upwards from the conveyor, i.e. it approximates the upward table plane normal
-   const double rx = 0.089325;
-   const double ry = -0.812677;
-   const double rz = -0.575827;
-   // NOTE: the reference axis MUST be L2-normalized to 1!!!
+   const double rx = -0.01395;
+   const double ry = -0.76624;
+   const double rz = -0.64241;
+
+  // NOTE: the reference axis MUST be L2-normalized to 1!!!
 
    // Table point - together with the reference axis, this specifies a full 3D plane of the conveyor
-   const double px = -0.064774;//-0.124742;
-   const double py = -0.128048;//-0.033529;
-   const double pz = 0.909000;//0.796000;
-//X:-0.064774 Y:-0.128048 Z:0.909000
+   const double px = -0.043472;
+   const double py = -0.018472;
+   const double pz =  0.856371;
 
    
    // Filter away poses where y-axis of object frame is not close to parallel with reference axis, and also point all accepted poses in the same direction as the reference axis
    Detection::Vec result = vertical(detections, axis, rx, ry, rz, 25.0 * M_PI / 180.0, true);
    
    // Filter away poses where the position of the object (i.e. the translation component) is far above or below the plane specified by [rx ry rz] and [px py pz]
-   const double thres = 0.15; // Euclidean threshold
+   const double thres = 0.05; // Euclidean threshold
    result = aboveOrBelowTable(result, px, py, pz, rx, ry, rz, thres);
    
    return result;
