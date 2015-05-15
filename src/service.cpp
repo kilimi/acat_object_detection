@@ -78,7 +78,7 @@ void storeResults(DetectObject::Response &resp, Detection::Vec rot_alone){
 		result.rotation.y = quaternion[2];
 		result.rotation.z = quaternion[3];
 
-		ROS_INFO_STREAM("m_original:" << pose);
+		//ROS_INFO_STREAM("m_original:" << pose);
 
 		resp.poses.push_back(result);
 		resp.pose_value[i] = 1 - di.penalty;
@@ -87,7 +87,7 @@ void storeResults(DetectObject::Response &resp, Detection::Vec rot_alone){
 
 bool global(DetectObject::Request &req, DetectObject::Response &resp){
 
-	ROS_INFO("Starting pose estimation...");
+	//ROS_INFO("Starting pose estimation...");
 	bool visualize = req.visualize;
 	bool table = req.table;
 	bool rotorcap = req.rotorcap;
@@ -96,9 +96,9 @@ bool global(DetectObject::Request &req, DetectObject::Response &resp){
 	bool planar = false;
 	bool verbose = false;
 
-    float resolution = req.threshold;
+    	float resolution = req.threshold;
 	float radius = 35;
-    float threshold = 10;
+    	float threshold = 10;
 	float fraction = 0.25;
 	float far = 1500;
 	float cothres = req.cothres;
@@ -129,7 +129,7 @@ bool global(DetectObject::Request &req, DetectObject::Response &resp){
 	}
 
 	// Report
-	ROS_INFO("Starting estimation...");
+	//ROS_INFO("Starting estimation...");
 
 	// Start
 	DescriptorUtil util;
@@ -144,11 +144,13 @@ bool global(DetectObject::Request &req, DetectObject::Response &resp){
 		du.showDetections<DescT>(rec->getObjects(), rec->getScene(), globalres);
 	}
 	if (rotorcap){
-		pcl::console::print_warn("Removing bad rotorcaps! \n");
-		Detection::Vec new_rotorcaps = filter(globalres); // TODO: THIS DOES NOT WORK AFTER FIXING Quaternion error in SERVICE
-		pcl::console::print_value("Amount of detections after: %d\n", new_rotorcaps.size());
+		//pcl::console::print_warn("Removing bad rotorcaps! \n");
 
-		if (visualize){
+        std::vector<double> constrains = req.constrains;
+
+        Detection::Vec new_rotorcaps = filter(globalres, constrains, constrains[6]);
+
+	if (visualize){
 			DescriptorUtil   du1;
 			du1.showDetections<DescT>(rec->getObjects(), rec->getScene(), new_rotorcaps);
 		}
@@ -157,7 +159,7 @@ bool global(DetectObject::Request &req, DetectObject::Response &resp){
 		storeResults(resp, best_pose);
 	}
 
-	ROS_INFO("Finished GLOBAL estimation!");
+	//ROS_INFO("Finished GLOBAL estimation!");
 
 	return true;
 }

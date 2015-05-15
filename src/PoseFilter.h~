@@ -36,35 +36,53 @@ namespace PoseEstimation {
 
 // Declarations
 Detection::Vec vertical(const Detection::Vec& detections, int axis, double rx, double ry, double rz, double atol, bool flip);
-Detection::Vec aboveOrBelowTable(const Detection::Vec& detections, double px, double py, double pz, double rx, double ry, double rz, double thres);   
+Detection::Vec aboveOrBelowTable(const Detection::Vec& detections, double px, double py, double pz, double rx, double ry, double rz, double thres);  
+Detection::Vec badGoodness(const Detection::Vec& detections); 
 /**
  * Apply a cascade of pose filters - right now it only checks for poses with a vertical y-axis, and also makes sure they point upwards
  * @param detections detections to filter
  * @return filtered detections
  */
-Detection::Vec filter(const Detection::Vec& detections) {
+Detection::Vec filter(const Detection::Vec& detections, std::vector<double> constr, double thresx) {
    // Choose which axis in the poses you want to align to a reference axis
    const int axis = 1;
    
    // Choose reference axis - this I found by clicking in bm_filtered.pcd as an axis pointing upwards from the conveyor, i.e. it approximates the upward table plane normal
-   const double rx = -0.01395;
-   const double ry = -0.76624;
-   const double rz = -0.64241;
+   const double rx = constr[0];//-0.01395;
+   const double ry = constr[1];//-0.76624;
+   const double rz = constr[2];//-0.64241;
 
   // NOTE: the reference axis MUST be L2-normalized to 1!!!
 
    // Table point - together with the reference axis, this specifies a full 3D plane of the conveyor
-   const double px = -0.043472;
-   const double py = -0.018472;
-   const double pz =  0.856371;
+   const double px = constr[3]; //-0.043472;
+   const double py = constr[4]; //-0.018472;
+   const double pz = constr[5]; // 0.856371;
 
    
    // Filter away poses where y-axis of object frame is not close to parallel with reference axis, and also point all accepted poses in the same direction as the reference axis
    Detection::Vec result = vertical(detections, axis, rx, ry, rz, 25.0 * M_PI / 180.0, true);
    
    // Filter away poses where the position of the object (i.e. the translation component) is far above or below the plane specified by [rx ry rz] and [px py pz]
-   const double thres = 0.05; // Euclidean threshold
-   result = aboveOrBelowTable(result, px, py, pz, rx, ry, rz, thres);
+  // const double thres = 0.05;//0.05; // Euclidean threshold
+ 
+if (thresx != -1) result = aboveOrBelowTable(result, px, py, pz, rx, ry, rz, thresx);
+   result = badGoodness(result);
+   return result;
+}
+/**
+ * Remove poses with bad goodness value
+ *
+ * 
+ */
+Detection::Vec badGoodness(const Detection::Vec& detections) {
+   
+   Detection::Vec result;
+   for(size_t i = 0; i < detections.size(); ++i) {
+     Detection d = detections[i];
+	if ((1 - d.penalty) > 0.79)     
+		result.push_back(d);
+   }
    
    return result;
 }
