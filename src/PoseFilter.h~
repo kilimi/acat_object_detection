@@ -61,13 +61,14 @@ Detection::Vec filter(const Detection::Vec& detections, std::vector<double> cons
 
    
    // Filter away poses where y-axis of object frame is not close to parallel with reference axis, and also point all accepted poses in the same direction as the reference axis
-   Detection::Vec result = vertical(detections, axis, rx, ry, rz, 25.0 * M_PI / 180.0, true);
+   Detection::Vec result = vertical(detections, axis, rx, ry, rz, 10.0 * M_PI / 180.0, true); //25
    
    // Filter away poses where the position of the object (i.e. the translation component) is far above or below the plane specified by [rx ry rz] and [px py pz]
   // const double thres = 0.05;//0.05; // Euclidean threshold
  
-if (thresx != -1) result = aboveOrBelowTable(result, px, py, pz, rx, ry, rz, thresx);
+   if (thresx != -1) result = aboveOrBelowTable(result, px, py, pz, rx, ry, rz, thresx);
    result = badGoodness(result);
+   pcl::console::print_value("After constrains left:  %d\n", result.size());
    return result;
 }
 /**
@@ -80,7 +81,7 @@ Detection::Vec badGoodness(const Detection::Vec& detections) {
    Detection::Vec result;
    for(size_t i = 0; i < detections.size(); ++i) {
      Detection d = detections[i];
-	if ((1 - d.penalty) > 0.79)     
+	if ((1 - d.penalty) > 0.75)     
 		result.push_back(d);
    }
    
@@ -167,9 +168,9 @@ Detection::Vec aboveOrBelowTable(const Detection::Vec& detections, double px, do
       // Now the actual threshold: the pose must be close to the plane
       if(p2p <= thres) {
          result.push_back(detections[i]);
-pcl::console::print_warn("Kept %f\n", p2p);
+
 }
-else pcl::console::print_error("REMOVED ONE %f!\n", p2p);
+//else pcl::console::print_error("REMOVED ONE %f!\n", p2p);
    }
    
    return result;

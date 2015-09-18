@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(object_detection)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 ## Find catkin and any catkin packages
 find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs genmsg geometry_msgs sensor_msgs pose_estimation)
 

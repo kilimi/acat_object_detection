@@ -81,7 +81,7 @@ void storeResults(DetectObject::Response &resp, Detection::Vec rot_alone){
 		//ROS_INFO_STREAM("m_original:" << pose);
 
 		resp.poses.push_back(result);
-		resp.pose_value[i] = 1 - di.penalty;
+        resp.pose_value[i] = 1 - di.penalty;
 	}
 }
 
@@ -118,6 +118,7 @@ bool global(DetectObject::Request &req, DetectObject::Response &resp){
 		rec->setCorrNum(corrnum);
 	rec->setVerbose(verbose);
 	rec->loadObjects(_objects);
+	
 
 	// Get the scene
 	pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr scene(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
@@ -134,6 +135,10 @@ bool global(DetectObject::Request &req, DetectObject::Response &resp){
 	// Start
 	DescriptorUtil util;
 	DescT::Vec scene_covis = util.fromPCL<pcl::PointXYZRGBNormal,DescT>(*scene);
+	/*if (rotorcap) {
+		rec->setOverlapRemoval(true);
+                fraction = 0.1;
+	}*/
 	Detection::Vec globalres = rec->recognize(scene_covis);
 	const Detection& best = globalres[0];
 	Detection::Vec best_pose;
@@ -147,8 +152,9 @@ bool global(DetectObject::Request &req, DetectObject::Response &resp){
 		//pcl::console::print_warn("Removing bad rotorcaps! \n");
 
         std::vector<double> constrains = req.constrains;
-	pcl::console::print_warn("Threshold: %d %d! \n", constrains[6], constrains[5]);
+
         Detection::Vec new_rotorcaps = filter(globalres, constrains, constrains[6]);
+
 
 	if (visualize){
 			DescriptorUtil   du1;
@@ -175,6 +181,7 @@ int main(int argc, char **argv) {
 	ros::init(argc, argv, name);
 	ros::NodeHandle nh("~");
 	// Start
+        pcl::console::setVerbosityLevel(pcl::console::L_WARN);
 	ros::ServiceServer servglobal = nh.advertiseService<DetectObject::Request, DetectObject::Response>("getPose", global);
 	ros::spin();
 
